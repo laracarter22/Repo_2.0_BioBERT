@@ -144,20 +144,23 @@ print("Class weights:", class_weights_dict)
 
 # -------------- **NEW**: Define custom loss function to apply class weights -------------------
 class CustomTrainer(Trainer):
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """
-        Override the Trainer's compute_loss method to apply class weights.
+        Override the Trainer's compute_loss method to apply class weights and handle additional arguments.
         """
         labels = inputs.get("labels")
+        
         # Forward pass
         outputs = model(**inputs)
         logits = outputs.logits
         
-        # We need to flatten the inputs for computing the loss correctly
+        # Compute the loss using class weights
         loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
         loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
         
+        # Handle any additional arguments passed to the method
         return (loss, outputs) if return_outputs else loss
+
 
 
 # Training arguments with early stopping
