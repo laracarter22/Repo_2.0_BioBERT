@@ -143,20 +143,22 @@ class_weights_dict = {label2id[label]: weight for label, weight in zip(label_lis
 print("Class weights:", class_weights_dict)
 
 # -------------- **NEW**: Define custom loss function to apply class weights -------------------
-def compute_weighted_loss(model, inputs, return_outputs=False):
-    """
-    Compute a loss that takes into account class weights.
-    """
-    labels = inputs.get("labels")
-    # Forward pass
-    outputs = model(**inputs)
-    logits = outputs.logits
-    
-    # We need to flatten the inputs for computing the loss correctly
-    loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
-    loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
-    
-    return (loss, outputs) if return_outputs else loss
+class CustomTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        Override the Trainer's compute_loss method to apply class weights.
+        """
+        labels = inputs.get("labels")
+        # Forward pass
+        outputs = model(**inputs)
+        logits = outputs.logits
+        
+        # We need to flatten the inputs for computing the loss correctly
+        loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
+        loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+        
+        return (loss, outputs) if return_outputs else loss
+
 
 # Training arguments with early stopping
 training_args = TrainingArguments(
@@ -178,11 +180,11 @@ training_args = TrainingArguments(
 
 # Early stopping callback
 early_stopping = EarlyStoppingCallback(
-    early_stopping_patience=50  # Stop training if no improvement after 3 evaluations
+    early_stopping_patience=10  # Stop training if no improvement after 3 evaluations
 )
 
 # Initialize Trainer with custom loss function
-trainer = Trainer(
+trainer = CustomTrainer(
     model=model,
     args=training_args,
     train_dataset=train_dataset,
@@ -190,7 +192,6 @@ trainer = Trainer(
     tokenizer=tokenizer,
     compute_metrics=compute_metrics,
     callbacks=[early_stopping],
-    compute_loss=compute_weighted_loss  # Use custom loss function with class weights
 )
 
 # Train the model
