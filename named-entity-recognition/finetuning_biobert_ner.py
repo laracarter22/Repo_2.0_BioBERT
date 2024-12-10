@@ -141,6 +141,7 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     logging_dir="./logs",
     logging_steps=10,
+    report_to = "none",
     load_best_model_at_end=True,
     metric_for_best_model="f1",  # Use F1 as the metric for early stopping
     greater_is_better=True,
