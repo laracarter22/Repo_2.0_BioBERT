@@ -9,6 +9,10 @@ from transformers import (
     pipeline,
 )
 from transformers.trainer_callback import EarlyStoppingCallback
+from sklearn.utils.class_weight import compute_class_weight
+import torch
+from torch.nn import CrossEntropyLoss
+import numpy as np
 
 # Define paths and model
 model_name_or_path = "dmis-lab/biobert-base-cased-v1.1"
@@ -80,7 +84,7 @@ def tokenize_and_align_labels(examples):
         examples["text"],
         truncation=True,
         padding=True,
-        max_length = 512,
+        max_length=512,
         is_split_into_words=True,  # Ensure the tokenizer understands words are pre-split
     )
 
@@ -129,6 +133,31 @@ def compute_metrics(p):
         "accuracy": results["overall_accuracy"],
     }
 
+# Compute class weights (class_weight='balanced' adjusts for imbalance)
+all_labels = [label for sentence_labels in train_data['labels'] for label in sentence_labels]
+class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(all_labels), y=all_labels)
+
+# Create a mapping from label to weight
+class_weights_dict = {label2id[label]: weight for label, weight in zip(label_list, class_weights)}
+
+print("Class weights:", class_weights_dict)
+
+# -------------- **NEW**: Define custom loss function to apply class weights -------------------
+def compute_weighted_loss(model, inputs, return_outputs=False):
+    """
+    Compute a loss that takes into account class weights.
+    """
+    labels = inputs.get("labels")
+    # Forward pass
+    outputs = model(**inputs)
+    logits = outputs.logits
+    
+    # We need to flatten the inputs for computing the loss correctly
+    loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
+    loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+    
+    return (loss, outputs) if return_outputs else loss
+
 # Training arguments with early stopping
 training_args = TrainingArguments(
     output_dir="./results",
@@ -141,7 +170,7 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     logging_dir="./logs",
     logging_steps=10,
-    report_to = "none",
+    report_to="none",
     load_best_model_at_end=True,
     metric_for_best_model="loss",  # Use F1 as the metric for early stopping
     greater_is_better=True,
@@ -152,7 +181,7 @@ early_stopping = EarlyStoppingCallback(
     early_stopping_patience=50  # Stop training if no improvement after 3 evaluations
 )
 
-# Initialize Trainer
+# Initialize Trainer with custom loss function
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -161,6 +190,7 @@ trainer = Trainer(
     tokenizer=tokenizer,
     compute_metrics=compute_metrics,
     callbacks=[early_stopping],
+    compute_loss=compute_weighted_loss  # Use custom loss function with class weights
 )
 
 # Train the model
