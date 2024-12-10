@@ -134,7 +134,7 @@ training_args = TrainingArguments(
     output_dir="./results",
     evaluation_strategy="epoch",
     save_strategy="epoch",
-    learning_rate=2e-5,
+    learning_rate=1e-5,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
     num_train_epochs=50,
@@ -143,7 +143,7 @@ training_args = TrainingArguments(
     logging_steps=10,
     report_to = "none",
     load_best_model_at_end=True,
-    metric_for_best_model="f1",  # Use F1 as the metric for early stopping
+    metric_for_best_model="loss",  # Use F1 as the metric for early stopping
     greater_is_better=True,
 )
 
