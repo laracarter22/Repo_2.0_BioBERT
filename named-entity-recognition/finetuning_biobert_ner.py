@@ -149,7 +149,7 @@ training_args = TrainingArguments(
 
 # Early stopping callback
 early_stopping = EarlyStoppingCallback(
-    early_stopping_patience=3  # Stop training if no improvement after 3 evaluations
+    early_stopping_patience=50  # Stop training if no improvement after 3 evaluations
 )
 
 # Initialize Trainer
