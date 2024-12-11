@@ -134,8 +134,14 @@ def compute_metrics(p):
     }
 
 # Compute class weights (class_weight='balanced' adjusts for imbalance)
-all_labels = [label for sentence_labels in train_data['labels'] for label in sentence_labels]
-class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(all_labels), y=all_labels)
+#all_labels = [label for sentence_labels in train_data['labels'] for label in sentence_labels]
+
+all_labels = [label2id[label] for sentence_labels in train_data['labels'] for label in sentence_labels]
+
+class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(all_labels), y=all_labels)
+class_weights_dict = {i: weight for i, weight in zip(np.unique(all_labels), class_weights)}
+
+print("Class weights (numeric):", class_weights_dict)
 
 # Create a mapping from label to weight
 class_weights_dict = {label2id[label]: weight for label, weight in zip(label_list, class_weights)}
@@ -149,7 +155,7 @@ class CustomTrainer(Trainer):
         Override the Trainer's compute_loss method to apply class weights and handle additional arguments.
         """
         #labels = inputs.get("labels").long()
-        labels = inputs["labels"].to(dtype=torch.long)
+        labels = inputs["labels"].to(dtype=torch.long, device=model.device)
         outputs = model(**inputs)
        # logits = model(**inputs).logits.float()
         logits = outputs.logits.to(dtype=torch.float32)
@@ -228,9 +234,12 @@ print("Test Results:")
 for key, value in test_results.items():
     print(f"{key}: {value}")
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
 # Inference on new text using fine-tuned model
-ner_pipeline = pipeline("ner", model="./fine_tuned_biobert_ner", tokenizer="./fine_tuned_biobert_ner")
-sample_text = "The patient was prescribed metformin for diabetes."
+ner_pipeline = pipeline("ner", model="./fine_tuned_biobert_ner", tokenizer="./fine_tuned_biobert_ner", device=0 if torch.cuda.is_available() else -1)
+sample_text = "The pharmacokinetic profile of the drug revealed that the maximum plasma concentration (Cmax) was reached 2 hours post-administration, with a half-life of approximately 6 hours, indicating the need for twice-daily dosing to maintain therapeutic levels, while the area under the curve (AUC) suggested sufficient bioavailability for effective treatment of the condition."
 results = ner_pipeline(sample_text)
 
 print("\nNER Results on Sample Text:")
