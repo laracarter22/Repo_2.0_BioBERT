@@ -99,7 +99,8 @@ def tokenize_and_align_labels(examples):
             elif word_idx != previous_word_idx:  # Start of a new word
                 label_ids.append(label2id[labels[word_idx]])  # Map label to integer
             else:  # Continuation of the same word
-                label_ids.append(label2id[labels[word_idx]])  # Map label to integer
+                #label_ids.append(label2id[labels[word_idx]])  # Map label to integer
+                label_ids.append(-100) 
             previous_word_idx = word_idx
         all_labels.append(label_ids)
 
