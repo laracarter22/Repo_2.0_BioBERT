@@ -148,14 +148,21 @@ class CustomTrainer(Trainer):
         """
         Override the Trainer's compute_loss method to apply class weights and handle additional arguments.
         """
-        labels = inputs.get("labels")
-        
+        labels = inputs.get("labels").long()
+        logits = model(**inputs).logits.float()
+
         # Forward pass
-        outputs = model(**inputs)
-        logits = outputs.logits
+        #outputs = model(**inputs)
+       # logits = outputs.logits
+
         
         # Compute the loss using class weights
-        loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
+       # loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
+       # loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+        
+        loss_fct = CrossEntropyLoss(
+            weight=torch.tensor(list(class_weights_dict.values())).to(labels.device)
+        )
         loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
         
         # Handle any additional arguments passed to the method
@@ -177,7 +184,7 @@ training_args = TrainingArguments(
     logging_steps=10,
     report_to="none",
     load_best_model_at_end=True,
-    metric_for_best_model="loss",  # Use F1 as the metric for early stopping
+    metric_for_best_model="eval_loss",  
     greater_is_better=True,
 )
 
