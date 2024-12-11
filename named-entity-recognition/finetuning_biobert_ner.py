@@ -149,17 +149,74 @@ class_weights_dict = {label2id[label]: weight for label, weight in zip(label_lis
 
 print("Class weights:", class_weights_dict)
 
+
+#Attempting Implementation of Focal Loss to Less Aggressively weight the classes
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=None, ignore_index=-100):
+        """
+        Focal Loss for class imbalance.
+
+        Args:
+        - gamma (float): Focusing parameter to reduce the loss for well-classified examples.
+        - alpha (list, optional): Class weights to address class imbalance (can be set to `None`).
+        - ignore_index (int): Index to ignore in loss computation.
+        """
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.ignore_index = ignore_index
+
+    def forward(self, logits, targets):
+        """
+        Forward pass for Focal Loss.
+
+        Args:
+        - logits (Tensor): Model predictions of shape (batch_size, num_classes).
+        - targets (Tensor): Ground-truth labels of shape (batch_size).
+
+        Returns:
+        - loss (Tensor): Computed Focal Loss.
+        """
+        # Compute cross-entropy loss
+        ce_loss = F.cross_entropy(
+            logits.view(-1, logits.size(-1)), 
+            targets.view(-1), 
+            reduction="none", 
+            ignore_index=self.ignore_index
+        )
+
+        # Get the probabilities for the true class
+        pt = torch.exp(-ce_loss)
+
+        # Apply the focal loss scaling factor
+        focal_loss = ((1 - pt) ** self.gamma) * ce_loss
+
+        # Apply class weights (if provided)
+        if self.alpha is not None:
+            alpha_t = self.alpha.gather(0, targets.view(-1))
+            focal_loss = alpha_t * focal_loss
+
+        # Compute the mean loss
+        return focal_loss.mean()
+
+
+
 # -------------- **NEW**: Define custom loss function to apply class weights -------------------
-class CustomTrainer(Trainer):
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
-        """
-        Override the Trainer's compute_loss method to apply class weights and handle additional arguments.
-        """
-        #labels = inputs.get("labels").long()
-        labels = inputs["labels"].to(dtype=torch.long, device=model.device)
-        outputs = model(**inputs)
-       # logits = model(**inputs).logits.float()
-        logits = outputs.logits.to(dtype=torch.float32)
+#class CustomTrainer(Trainer):
+ #   def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+  #      """
+  #      Override the Trainer's compute_loss method to apply class weights and handle additional arguments.
+   #     """
+    #    #labels = inputs.get("labels").long()
+     #   labels = inputs["labels"].to(dtype=torch.long, device=model.device)
+      #  outputs = model(**inputs)
+       ## logits = model(**inputs).logits.float()
+       # logits = outputs.logits.to(dtype=torch.float32)
 
         # Forward pass
         #outputs = model(**inputs)
@@ -174,17 +231,36 @@ class CustomTrainer(Trainer):
         #    weight=torch.tensor(list(class_weights_dict.values())).to(labels.device)
         #)
         #loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
-        weights = torch.tensor(list(class_weights_dict.values()), dtype=torch.float32).to(labels.device)
-        loss_fct = CrossEntropyLoss(weight=weights)
+     #   weights = torch.tensor(list(class_weights_dict.values()), dtype=torch.float32).to(labels.device)
+      #  loss_fct = CrossEntropyLoss(weight=weights)
         
-        print(f"logits shape: {logits.shape}, dtype: {logits.dtype}")
-        print(f"labels shape: {labels.shape}, dtype: {labels.dtype}")
+       # print(f"logits shape: {logits.shape}, dtype: {logits.dtype}")
+      #  print(f"labels shape: {labels.shape}, dtype: {labels.dtype}")
 
         # Handle any additional arguments passed to the method
         #return (loss, logits) if return_outputs else loss
-        loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
-        return (loss, outputs) if return_outputs else loss
+      #  loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+       # return (loss, outputs) if return_outputs else loss
 
+#Custom Trainer with Focal Loss
+
+class CustomTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+        """
+        Override the Trainer's compute_loss method to apply Focal Loss.
+        """
+        labels = inputs["labels"].to(dtype=torch.long, device=model.device)
+        outputs = model(**inputs)
+        logits = outputs.logits
+
+        # Define Focal Loss
+        weights = torch.tensor(list(class_weights_dict.values()), dtype=torch.float32).to(labels.device)
+        loss_fct = FocalLoss(gamma=2.0, alpha=weights)
+
+        # Compute the loss
+        loss = loss_fct(logits, labels)
+
+        return (loss, outputs) if return_outputs else loss
 
 
 # Training arguments with early stopping
