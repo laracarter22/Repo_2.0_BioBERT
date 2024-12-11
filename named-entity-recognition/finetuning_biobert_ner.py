@@ -166,7 +166,7 @@ class CustomTrainer(Trainer):
         loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
         
         # Handle any additional arguments passed to the method
-        return (loss, outputs) if return_outputs else loss
+        return (loss, logits) if return_outputs else loss
 
 
 
