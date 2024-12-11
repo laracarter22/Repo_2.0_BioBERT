@@ -148,8 +148,11 @@ class CustomTrainer(Trainer):
         """
         Override the Trainer's compute_loss method to apply class weights and handle additional arguments.
         """
-        labels = inputs.get("labels").long()
-        logits = model(**inputs).logits.float()
+        #labels = inputs.get("labels").long()
+        labels = inputs["labels"].to(dtype=torch.long)
+        outputs = model(**inputs)
+       # logits = model(**inputs).logits.float()
+        logits = outputs.logits.to(dtype=torch.float32)
 
         # Forward pass
         #outputs = model(**inputs)
@@ -160,13 +163,20 @@ class CustomTrainer(Trainer):
        # loss_fct = CrossEntropyLoss(weight=torch.tensor(list(class_weights_dict.values())).to(inputs['input_ids'].device))
        # loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
         
-        loss_fct = CrossEntropyLoss(
-            weight=torch.tensor(list(class_weights_dict.values())).to(labels.device)
-        )
-        loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+       # loss_fct = CrossEntropyLoss(
+        #    weight=torch.tensor(list(class_weights_dict.values())).to(labels.device)
+        #)
+        #loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+        weights = torch.tensor(list(class_weights_dict.values()), dtype=torch.float32).to(labels.device)
+        loss_fct = CrossEntropyLoss(weight=weights)
         
+        print(f"logits shape: {logits.shape}, dtype: {logits.dtype}")
+        print(f"labels shape: {labels.shape}, dtype: {labels.dtype}")
+
         # Handle any additional arguments passed to the method
-        return (loss, logits) if return_outputs else loss
+        #return (loss, logits) if return_outputs else loss
+        loss = loss_fct(logits.view(-1, model.config.num_labels), labels.view(-1))
+        return (loss, outputs) if return_outputs else loss
 
 
 
