@@ -33,3 +33,9 @@ try:
     print("Successfully installed 'torch'!")
 except subprocess.CalledProcessError as e:
     print(f"An error occurred while installing 'torch': {e}")
+
+try:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "evaluate"])
+    print("Successfully installed 'evaluate'!")
+except subprocess.CalledProcessError as e:
+    print(f"An error occurred while installing 'evaluate': {e}")
