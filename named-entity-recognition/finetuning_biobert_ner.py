@@ -14,6 +14,8 @@ import torch
 from torch.nn import CrossEntropyLoss
 import numpy as np
 
+CUDA_LAUNCH_BLOCKING=1
+
 # Define paths and model
 model_name_or_path = "dmis-lab/biobert-base-cased-v1.1"
 train_file = "./scripts/lara_preprocessed_conll/train.conll"
